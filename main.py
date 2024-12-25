@@ -112,6 +112,6 @@ if __name__ == "__main__":
     convert_raw_to_video(raw_file, output_video_file=output_video_file)
 
     # 処理完了後、中間ファイルを削除する場合（オプション）
-    # if os.path.exists(raw_file):
-    #     os.remove(raw_file)
-    #     print(f"中間ファイルを削除しました: {raw_file}")
+    if os.path.exists(raw_file):
+        os.remove(raw_file)
+        print(f"中間ファイルを削除しました: {raw_file}")
