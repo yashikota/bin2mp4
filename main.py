@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     # 出力ファイル名
     output_video_file = (
-        f"video/output_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.mp4"
+        f"video/output_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.mp4"
     )
 
     # RAW形式に変換
