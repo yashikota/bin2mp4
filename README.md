@@ -2,6 +2,8 @@
 
 ## 準備
 
+実行は初回だけで良い。  
+
 ```sh
 python prerequisite.py
 ```
