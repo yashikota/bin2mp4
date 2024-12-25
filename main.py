@@ -59,7 +59,7 @@ def convert_raw_to_video(
     FFmpegを使用してRAWファイルを動画ファイルに変換
     """
     ffmpeg_command = [
-        "third_party/ffmpeg.exe",
+        "ffmpeg.exe",
         "-f",
         "rawvideo",
         "-pixel_format",
@@ -70,6 +70,8 @@ def convert_raw_to_video(
         str(frame_rate),
         "-i",
         raw_file,
+        "-vf",
+        "hflip,grayworld",
         "-c:v",
         "libx264",
         "-pix_fmt",
@@ -110,6 +112,6 @@ if __name__ == "__main__":
     convert_raw_to_video(raw_file, output_video_file=output_video_file)
 
     # 処理完了後、中間ファイルを削除する場合（オプション）
-    if os.path.exists(raw_file):
-        os.remove(raw_file)
-        print(f"中間ファイルを削除しました: {raw_file}")
+    # if os.path.exists(raw_file):
+    #     os.remove(raw_file)
+    #     print(f"中間ファイルを削除しました: {raw_file}")
