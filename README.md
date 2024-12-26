@@ -9,10 +9,10 @@
     ```sh
     winget install ffmpeg
     ```
-    
+
     ※ wingetがない場合は [GitHub](https://github.com/GyanD/codexffmpeg/releases/latest) から `ffmpeg-{バージョン番号}-full_build.zip` DLしてパスを通す
 
-3. numpy
+2. numpy
 
     ```sh
     pip install numpy
