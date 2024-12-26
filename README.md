@@ -4,9 +4,16 @@
 
 実行は初回だけで良い。  
 
-```sh
-python prerequisite.py
-```
+1. FFmpeg
+    <https://github.com/GyanD/codexffmpeg/releases/latest> からDLしてパスを通すか `winget install ffmpeg`
+
+2. numpy
+
+    ```sh
+    pip install numpy
+    ```
+
+    ※ [uv](https://github.com/astral-sh/uv) を使っている場合は `uv sync` でOK
 
 ## 実行
 

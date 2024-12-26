@@ -4,51 +4,43 @@ import subprocess
 import tkinter
 import tkinter.filedialog as tkfd
 
+import numpy as np
 
-def combine_rgb_to_raw(filelist, output_file="output.rgb", width=160, height=120, chunk_frames=100):
+
+def combine_rgb_to_raw(filelist, output_file="output.rgb", width=160, height=120):
     """
     各チャンネルのBINファイルを結合し、FFmpegで扱えるRAW形式に変換する
     """
     filelist.sort()
-    chunk_size = width * height * chunk_frames
+    # 各チャンネルのデータを読み込む
+    with open(filelist[0], "rb") as rf:
+        r_data = np.fromfile(rf, dtype=np.uint8)
+    with open(filelist[1], "rb") as gf:
+        g_data = np.fromfile(gf, dtype=np.uint8)
+    with open(filelist[2], "rb") as bf:
+        b_data = np.fromfile(bf, dtype=np.uint8)
 
-    # ファイルサイズを確認
-    r_size = os.path.getsize(filelist[0])
-    g_size = os.path.getsize(filelist[1])
-    b_size = os.path.getsize(filelist[2])
-
-    if not (r_size == g_size == b_size):
+    # データサイズを確認
+    if not (len(r_data) == len(g_data) == len(b_data)):
         raise ValueError("R, G, Bのファイルサイズが一致していません。")
 
     # フレーム数を計算
-    frame_count = r_size // (width * height)
-    if r_size % (width * height) != 0:
+    frame_count = len(r_data) // (width * height)
+    if len(r_data) % (width * height) != 0:
         raise ValueError("データサイズが正しくないため、フレーム数が計算できません。")
 
     print(f"フレーム数: {frame_count}, サイズ: {width}x{height}")
 
-    # チャンク単位で処理
-    with open(filelist[0], "rb") as rf, \
-         open(filelist[1], "rb") as gf, \
-         open(filelist[2], "rb") as bf, \
-         open(output_file, "wb") as outf:
+    # 各フレームをインターリーブ形式に結合
+    rgb_data = np.empty((frame_count, height, width, 3), dtype=np.uint8)
+    rgb_data[..., 0] = r_data.reshape((frame_count, height, width))
+    rgb_data[..., 1] = g_data.reshape((frame_count, height, width))
+    rgb_data[..., 2] = b_data.reshape((frame_count, height, width))
 
-        while True:
-            # チャンク単位でデータを読み込む
-            r_chunk = rf.read(chunk_size)
-            g_chunk = gf.read(chunk_size)
-            b_chunk = bf.read(chunk_size)
+    # インターリーブ形式で保存
+    rgb_data.tofile(output_file)
+    print(f"RAW形式のファイルを生成しました: {output_file}")
 
-            if not r_chunk:  # ファイル終端
-                break
-
-            # インターリーブ処理
-            for i in range(0, len(r_chunk)):
-                outf.write(bytes([r_chunk[i], g_chunk[i], b_chunk[i]]))
-
-            print(f"Progress: {rf.tell() / r_size * 100:.1f}%", end="\r")
-
-    print("\nRAW形式のファイルを生成しました:", output_file)
     return output_file, frame_count
 
 
@@ -59,7 +51,7 @@ def convert_raw_to_video(
     FFmpegを使用してRAWファイルを動画ファイルに変換
     """
     ffmpeg_command = [
-        "ffmpeg.exe",
+        "ffmpeg",
         "-f",
         "rawvideo",
         "-pixel_format",
@@ -87,7 +79,7 @@ def convert_raw_to_video(
         print(f"FFmpegの実行に失敗しました: {e}")
 
 
-if __name__ == "__main__":
+def main():
     os.makedirs("video", exist_ok=True)
 
     tk = tkinter.Tk()
@@ -106,7 +98,7 @@ if __name__ == "__main__":
     )
 
     # RAW形式に変換
-    raw_file, frame_count = combine_rgb_to_raw(list(filename))
+    raw_file = combine_rgb_to_raw(list(filename))
 
     # FFmpegで動画ファイルに変換
     convert_raw_to_video(raw_file, output_video_file=output_video_file)
@@ -115,3 +107,7 @@ if __name__ == "__main__":
     if os.path.exists(raw_file):
         os.remove(raw_file)
         print(f"中間ファイルを削除しました: {raw_file}")
+
+
+if __name__ == "__main__":
+    main()
