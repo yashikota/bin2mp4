@@ -41,7 +41,7 @@ def combine_rgb_to_raw(filelist, output_file="output.rgb", width=160, height=120
     rgb_data.tofile(output_file)
     print(f"RAW形式のファイルを生成しました: {output_file}")
 
-    return output_file, frame_count
+    return output_file
 
 
 def convert_raw_to_video(
