@@ -5,7 +5,7 @@
 実行は初回だけで良い。  
 
 1. FFmpeg
-    <https://github.com/GyanD/codexffmpeg/releases/latest> からDLしてパスを通すか `winget install ffmpeg`
+    <https://github.com/GyanD/codexffmpeg/releases/latest> から `ffmpeg-{バージョン番号}-full_build.zip` DLしてパスを通すか `winget install ffmpeg`
 
 2. numpy
 
