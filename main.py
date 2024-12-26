@@ -68,8 +68,12 @@ def convert_raw_to_video(
         "libx264",
         "-pix_fmt",
         "yuv420p",
+        "-loglevel",
+        "error",
         output_video_file,
     ]
+
+    print(f"FFmpegコマンド: {' '.join(ffmpeg_command)}")
 
     try:
         print("FFmpegで動画ファイルを生成中...")
