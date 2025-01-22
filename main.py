@@ -86,13 +86,15 @@ def main():
     os.makedirs("video", exist_ok=True)
 
     # ファイル一覧を再帰的に取得
-    dir = r"D:\kota\rec"
+    dir = r"C:\rec"
     bin_files = glob.glob(f"{dir}/**/*.bin", recursive=True)
 
     # ファイルが選択されていない場合は終了
     if not bin_files:
         print("ファイルが選択されていません。")
         exit()
+
+    bin_files.sort()
 
     # 3つずつに分割
     rgb = [bin_files[i : i + 3] for i in range(0, len(bin_files), 3)]
