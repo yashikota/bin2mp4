@@ -1,8 +1,7 @@
 import datetime
+import glob
 import os
 import subprocess
-import tkinter
-import tkinter.filedialog as tkfd
 
 import numpy as np
 
@@ -86,31 +85,36 @@ def convert_raw_to_video(
 def main():
     os.makedirs("video", exist_ok=True)
 
-    tk = tkinter.Tk()
-    filename = tkfd.askopenfilenames()  # ファイルダイアログの呼び出し
-    tk.withdraw()  # rootウィンドウを消す
-    tk.destroy()
+    # ファイル一覧を再帰的に取得
+    dir = r"D:\kota\rec"
+    bin_files = glob.glob(f"{dir}/**/*.bin", recursive=True)
 
     # ファイルが選択されていない場合は終了
-    if not filename:
+    if not bin_files:
         print("ファイルが選択されていません。")
         exit()
 
-    # 出力ファイル名
-    output_video_file = (
-        f"video/output_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.mp4"
-    )
+    # 3つずつに分割
+    rgb = [bin_files[i : i + 3] for i in range(0, len(bin_files), 3)]
 
-    # RAW形式に変換
-    raw_file = combine_rgb_to_raw(list(filename))
+    for i, files in enumerate(rgb):
+        print(f"i: {files}")
 
-    # FFmpegで動画ファイルに変換
-    convert_raw_to_video(raw_file, output_video_file=output_video_file)
+        # 出力ファイル名
+        output_video_file = (
+            f"video/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.mp4"
+        )
 
-    # 処理完了後、中間ファイルを削除する場合（オプション）
-    if os.path.exists(raw_file):
-        os.remove(raw_file)
-        print(f"中間ファイルを削除しました: {raw_file}")
+        # RAW形式に変換
+        raw_file = combine_rgb_to_raw(files, output_file=f"output_{i}.rgb")
+
+        # FFmpegで動画ファイルに変換
+        convert_raw_to_video(raw_file, output_video_file=output_video_file)
+
+        # 処理完了後、中間ファイルを削除する場合（オプション）
+        if os.path.exists(raw_file):
+            os.remove(raw_file)
+            print(f"中間ファイルを削除しました: {raw_file}")
 
 
 if __name__ == "__main__":
