@@ -72,7 +72,7 @@ def convert_raw_to_video(
         output_video_file,
     ]
 
-    print(f"FFmpegコマンド: {' '.join(ffmpeg_command)}")
+    # print(f"FFmpegコマンド: {' '.join(ffmpeg_command)}")
 
     try:
         print("FFmpegで動画ファイルを生成中...")
