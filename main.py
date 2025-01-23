@@ -1,7 +1,7 @@
-import datetime
 import glob
 import os
 import subprocess
+from pathlib import Path
 
 import numpy as np
 
@@ -30,9 +30,6 @@ def combine_rgb_to_raw(filelist, output_file="output.rgb", width=160, height=120
 
     print(f"フレーム数: {frame_count}, サイズ: {width}x{height}")
 
-    # 緑チャンネルを補正
-    g_data = (g_data * 0.5).astype(np.uint8)
-
     # 各フレームをインターリーブ形式に結合
     rgb_data = np.empty((frame_count, height, width, 3), dtype=np.uint8)
     rgb_data[..., 0] = r_data.reshape((frame_count, height, width))
@@ -41,7 +38,6 @@ def combine_rgb_to_raw(filelist, output_file="output.rgb", width=160, height=120
 
     # インターリーブ形式で保存
     rgb_data.tofile(output_file)
-    print(f"RAW形式のファイルを生成しました: {output_file}")
 
     return output_file
 
@@ -65,7 +61,7 @@ def convert_raw_to_video(
         "-i",
         raw_file,
         "-vf",
-        "hflip",
+        "hflip,grayworld",
         "-c:v",
         "libx264",
         "-pix_fmt",
@@ -73,53 +69,146 @@ def convert_raw_to_video(
         "-loglevel",
         "error",
         output_video_file,
+        "-y",
     ]
 
-    # print(f"FFmpegコマンド: {' '.join(ffmpeg_command)}")
-
     try:
-        print("FFmpegで動画ファイルを生成中...")
         subprocess.run(ffmpeg_command, check=True)
-        print(f"動画ファイルが生成されました: {output_video_file}")
     except subprocess.CalledProcessError as e:
         print(f"FFmpegの実行に失敗しました: {e}")
+
+
+def combine_videos(video1_path: str, video2_path: str, output_path: str) -> bool:
+    """
+    2つの動画を結合して新しい動画を生成する
+    オーバーレイ動画と結合動画を保存する
+    """
+    if not all(Path(p).exists() for p in [video1_path, video2_path]):
+        print("Error: Input video files not found")
+        return False
+
+    # オーバーレイ動画のパス生成
+    overlay_path = output_path.replace("_combined.mp4", "_overlay.mp4")
+
+    # オーバーレイ動画の生成
+    overlay_command = [
+        "ffmpeg",
+        "-i",
+        video1_path,
+        "-i",
+        video2_path,
+        "-filter_complex",
+        "[0:v][1:v]blend=all_expr='A*0.5+B*0.5'",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        overlay_path,
+    ]
+
+    # 結合動画の生成
+    combined_command = [
+        "ffmpeg",
+        "-i",
+        video1_path,
+        "-i",
+        video2_path,
+        "-i",
+        overlay_path,
+        "-filter_complex",
+        "[0:v][1:v]hstack[side];[side][2:v]hstack",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        output_path,
+    ]
+
+    try:
+        subprocess.run(overlay_command, check=True, capture_output=True)
+        subprocess.run(combined_command, check=True, capture_output=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error processing videos: {e.stderr.decode()}")
+        return False
+
+
+def group_bin_files(bin_files):
+    """
+    BINファイルをLとRで一致するものに分類する
+    """
+    grouped_files = {}
+    for file in bin_files:
+        base_identifier = os.path.splitext(os.path.basename(file))[0].rsplit("_", 1)[0]
+        channel = file.split("_")[-1].split(".")[0]
+
+        if channel in ["0", "1", "2"]:
+            if base_identifier not in grouped_files:
+                grouped_files[base_identifier] = {}
+
+            side = "l" if "l" in file.lower() else "r"
+            key = f"{side}_{channel}"
+            grouped_files[base_identifier][key] = file
+
+    return grouped_files
+
+
+def delete_processed_files(dir):
+    """
+    dir内のファイルを削除する
+    """
+    files = glob.glob(f"{dir}/**/*.*", recursive=True)
+    for file in files:
+        os.remove(file)
 
 
 def main():
     os.makedirs("video", exist_ok=True)
 
-    # ファイル一覧を再帰的に取得
-    dir = r"C:\rec"
+    dir = r"D:\kota\rec"
     bin_files = glob.glob(f"{dir}/**/*.bin", recursive=True)
 
-    # ファイルが選択されていない場合は終了
     if not bin_files:
         print("ファイルが選択されていません。")
-        exit()
+        return
 
-    bin_files.sort()
+    grouped_files = group_bin_files(bin_files)
 
-    # 3つずつに分割
-    rgb = [bin_files[i : i + 3] for i in range(0, len(bin_files), 3)]
+    for identifier, files in grouped_files.items():
+        l_files = [files[f"l_{i}"] for i in ["0", "1", "2"] if f"l_{i}" in files]
+        r_files = [files[f"r_{i}"] for i in ["0", "1", "2"] if f"r_{i}" in files]
 
-    for i, files in enumerate(rgb):
-        print(f"i: {files}")
+        processed_files = []
+        if len(l_files) == 3 and len(r_files) == 3:
+            # L側の処理
+            output_video_file_l = f"video/{identifier}_L.mp4"
+            raw_file_l = combine_rgb_to_raw(
+                l_files, output_file=f"output_l_{identifier}.rgb"
+            )
+            convert_raw_to_video(raw_file_l, output_video_file=output_video_file_l)
+            processed_files.extend(l_files)
 
-        # 出力ファイル名
-        output_video_file = (
-            f"video/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.mp4"
-        )
+            # R側の処理
+            output_video_file_r = f"video/{identifier}_R.mp4"
+            raw_file_r = combine_rgb_to_raw(
+                r_files, output_file=f"output_r_{identifier}.rgb"
+            )
+            convert_raw_to_video(raw_file_r, output_video_file=output_video_file_r)
+            processed_files.extend(r_files)
 
-        # RAW形式に変換
-        raw_file = combine_rgb_to_raw(files, output_file=f"output_{i}.rgb")
+            # 中間ファイル削除
+            for raw_file in [raw_file_l, raw_file_r]:
+                if os.path.exists(raw_file):
+                    os.remove(raw_file)
 
-        # FFmpegで動画ファイルに変換
-        convert_raw_to_video(raw_file, output_video_file=output_video_file)
+            # L/R動画と結合動画を出力
+            combined_video_file = f"video/{identifier}_combined.mp4"
+            combine_videos(
+                output_video_file_l, output_video_file_r, combined_video_file
+            )
 
-        # 処理完了後、中間ファイルを削除する場合（オプション）
-        if os.path.exists(raw_file):
-            os.remove(raw_file)
-            print(f"中間ファイルを削除しました: {raw_file}")
+    # ファイルを削除
+    delete_processed_files(dir)
 
 
 if __name__ == "__main__":
