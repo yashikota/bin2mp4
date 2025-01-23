@@ -189,7 +189,7 @@ def calculate_frame_count(bin_file, width, height):
 def main():
     os.makedirs("video", exist_ok=True)
 
-    dir = r"D:\kota\rec"
+    dir = r"C:\rec"
     bin_files = glob.glob(f"{dir}/**/*.bin", recursive=True)
 
     if not bin_files:
