@@ -6,7 +6,9 @@ from pathlib import Path
 import numpy as np
 
 
-def combine_rgb_to_raw(filelist, output_file="output.rgb", width=160, height=120):
+def combine_rgb_to_raw(
+    filelist, output_file="output.rgb", width=160, height=120, max_frame_count=None
+):
     """
     各チャンネルのBINファイルを結合し、FFmpegで扱えるRAW形式に変換する
     """
@@ -19,16 +21,27 @@ def combine_rgb_to_raw(filelist, output_file="output.rgb", width=160, height=120
     with open(filelist[2], "rb") as bf:
         b_data = np.fromfile(bf, dtype=np.uint8)
 
-    # データサイズを確認
-    if not (len(r_data) == len(g_data) == len(b_data)):
-        raise ValueError("R, G, Bのファイルサイズが一致していません。")
+    # データサイズを確認し、最小のサイズに合わせる
+    min_size = min(len(r_data), len(g_data), len(b_data))
+
+    # 最大フレーム数に合わせてデータを調整
+    if max_frame_count is not None:
+        required_size = max_frame_count * width * height
+        if required_size < min_size:
+            min_size = required_size
+
+    # データを最小サイズに切り詰め
+    r_data = r_data[:min_size]
+    g_data = g_data[:min_size]
+    b_data = b_data[:min_size]
 
     # フレーム数を計算
-    frame_count = len(r_data) // (width * height)
-    if len(r_data) % (width * height) != 0:
-        raise ValueError("データサイズが正しくないため、フレーム数が計算できません。")
-
-    print(f"フレーム数: {frame_count}, サイズ: {width}x{height}")
+    frame_count = min_size // (width * height)
+    if min_size % (width * height) != 0:
+        print("データサイズが正しくないため、最後の不完全なフレームを除外します。")
+        r_data = r_data[: frame_count * width * height]
+        g_data = g_data[: frame_count * width * height]
+        b_data = b_data[: frame_count * width * height]
 
     # 各フレームをインターリーブ形式に結合
     rgb_data = np.empty((frame_count, height, width, 3), dtype=np.uint8)
@@ -39,7 +52,7 @@ def combine_rgb_to_raw(filelist, output_file="output.rgb", width=160, height=120
     # インターリーブ形式で保存
     rgb_data.tofile(output_file)
 
-    return output_file
+    return output_file, frame_count, width, height
 
 
 def convert_raw_to_video(
@@ -104,6 +117,7 @@ def combine_videos(video1_path: str, video2_path: str, output_path: str) -> bool
         "-pix_fmt",
         "yuv420p",
         overlay_path,
+        "-y",  # ファイルを上書き
     ]
 
     # 結合動画の生成
@@ -116,12 +130,13 @@ def combine_videos(video1_path: str, video2_path: str, output_path: str) -> bool
         "-i",
         overlay_path,
         "-filter_complex",
-        "[0:v][1:v]hstack[side];[side][2:v]hstack",
+        "[0:v][1:v]hstack=inputs=2[top];[top][2:v]hstack=inputs=2",
         "-c:v",
         "libx264",
         "-pix_fmt",
         "yuv420p",
         output_path,
+        "-y",  # ファイルを上書き
     ]
 
     try:
@@ -162,6 +177,15 @@ def delete_processed_files(dir):
         os.remove(file)
 
 
+def calculate_frame_count(bin_file, width, height):
+    """
+    BINファイルのフレーム数を計算する
+    """
+    file_size = os.path.getsize(bin_file)
+    frame_size = width * height
+    return file_size // frame_size
+
+
 def main():
     os.makedirs("video", exist_ok=True)
 
@@ -174,26 +198,69 @@ def main():
 
     grouped_files = group_bin_files(bin_files)
 
+    width = 160
+    height = 120
+
     for identifier, files in grouped_files.items():
         l_files = [files[f"l_{i}"] for i in ["0", "1", "2"] if f"l_{i}" in files]
         r_files = [files[f"r_{i}"] for i in ["0", "1", "2"] if f"r_{i}" in files]
 
         processed_files = []
         if len(l_files) == 3 and len(r_files) == 3:
+            # L側のフレーム数を計算
+            frame_counts_l = [
+                calculate_frame_count(f, width, height) for f in l_files
+            ]
+            frame_l = min(frame_counts_l)
+
+            # R側のフレーム数を計算
+            frame_counts_r = [
+                calculate_frame_count(f, width, height) for f in r_files
+            ]
+            frame_r = min(frame_counts_r)
+
+            min_frame_count = min(frame_l, frame_r)
+
+            print(
+                f"{identifier}: size: {width}x{height}, frame counts L:{frame_l}, R:{frame_r}, using: {min_frame_count}"
+            )
+
             # L側の処理
             output_video_file_l = f"video/{identifier}_L.mp4"
-            raw_file_l = combine_rgb_to_raw(
-                l_files, output_file=f"output_l_{identifier}.rgb"
+            raw_file_l, frame_used_l, _, _ = combine_rgb_to_raw(
+                l_files,
+                output_file=f"output_l_{identifier}.rgb",
+                width=width,
+                height=height,
+                max_frame_count=min_frame_count,
             )
-            convert_raw_to_video(raw_file_l, output_video_file=output_video_file_l)
-            processed_files.extend(l_files)
 
             # R側の処理
             output_video_file_r = f"video/{identifier}_R.mp4"
-            raw_file_r = combine_rgb_to_raw(
-                r_files, output_file=f"output_r_{identifier}.rgb"
+            raw_file_r, frame_used_r, _, _ = combine_rgb_to_raw(
+                r_files,
+                output_file=f"output_r_{identifier}.rgb",
+                width=width,
+                height=height,
+                max_frame_count=min_frame_count,
             )
-            convert_raw_to_video(raw_file_r, output_video_file=output_video_file_r)
+
+            # L側の動画を生成
+            convert_raw_to_video(
+                raw_file_l,
+                width=width,
+                height=height,
+                output_video_file=output_video_file_l,
+            )
+            processed_files.extend(l_files)
+
+            # R側の動画を生成
+            convert_raw_to_video(
+                raw_file_r,
+                width=width,
+                height=height,
+                output_video_file=output_video_file_r,
+            )
             processed_files.extend(r_files)
 
             # 中間ファイル削除
