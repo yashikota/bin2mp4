@@ -30,6 +30,9 @@ def combine_rgb_to_raw(filelist, output_file="output.rgb", width=160, height=120
 
     print(f"フレーム数: {frame_count}, サイズ: {width}x{height}")
 
+    # 緑チャンネルを補正
+    g_data = (g_data * 0.5).astype(np.uint8)
+
     # 各フレームをインターリーブ形式に結合
     rgb_data = np.empty((frame_count, height, width, 3), dtype=np.uint8)
     rgb_data[..., 0] = r_data.reshape((frame_count, height, width))
@@ -44,7 +47,7 @@ def combine_rgb_to_raw(filelist, output_file="output.rgb", width=160, height=120
 
 
 def convert_raw_to_video(
-    raw_file, width=160, height=120, frame_rate=30, output_video_file="output.mp4"
+    raw_file, width=160, height=120, frame_rate=111, output_video_file="output.mp4"
 ):
     """
     FFmpegを使用してRAWファイルを動画ファイルに変換
@@ -62,7 +65,7 @@ def convert_raw_to_video(
         "-i",
         raw_file,
         "-vf",
-        "hflip,grayworld",
+        "hflip",
         "-c:v",
         "libx264",
         "-pix_fmt",
