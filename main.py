@@ -139,9 +139,27 @@ def combine_videos(video1_path: str, video2_path: str, output_path: str) -> bool
         "-y",  # ファイルを上書き
     ]
 
+    # GIFに変換
+    gif_command = [
+        "ffmpeg",
+        "-i",
+        video1_path,
+        "-i",
+        video2_path,
+        "-filter_complex",
+        "[0:v][1:v]hstack=inputs=2,fps=10",
+        "-c:v",
+        "gif",
+        "-loop",
+        "0",
+        output_path.replace(".mp4", ".gif"),
+        "-y",  # ファイルを上書き
+    ]
+
     try:
         subprocess.run(overlay_command, check=True, capture_output=True)
         subprocess.run(combined_command, check=True, capture_output=True)
+        subprocess.run(gif_command, check=True, capture_output=True)
         return True
     except subprocess.CalledProcessError as e:
         print(f"Error processing videos: {e.stderr.decode()}")
@@ -208,15 +226,11 @@ def main():
         processed_files = []
         if len(l_files) == 3 and len(r_files) == 3:
             # L側のフレーム数を計算
-            frame_counts_l = [
-                calculate_frame_count(f, width, height) for f in l_files
-            ]
+            frame_counts_l = [calculate_frame_count(f, width, height) for f in l_files]
             frame_l = min(frame_counts_l)
 
             # R側のフレーム数を計算
-            frame_counts_r = [
-                calculate_frame_count(f, width, height) for f in r_files
-            ]
+            frame_counts_r = [calculate_frame_count(f, width, height) for f in r_files]
             frame_r = min(frame_counts_r)
 
             min_frame_count = min(frame_l, frame_r)
